@@ -2,10 +2,10 @@
 title: "Practical Machine Learning Project"
 author: "Nutty"
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
-output: 
-    html_document:
+output:
+  html_document: 
     keep_md: yes
-    pdf_document: default
+  pdf_document: default
 ---
 
 
@@ -36,7 +36,7 @@ The goal of your project is to predict the manner in which they did the exercise
 
 Below are the steps we undertake to build a model
 ```{r setup, include=FALSE,echo=FALSE,warning=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(TZ='Australia/Melbourne')
 library(caret)
 library(rpart)
 library(rpart.plot)
@@ -150,4 +150,3 @@ predictfinal
 
 
 ```
-\begin{center}---END---\end{center}
