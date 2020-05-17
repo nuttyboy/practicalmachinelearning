@@ -1,33 +1,153 @@
 ---
 title: "Practical Machine Learning Project"
 author: "Nutty"
-date: "16/05/2020"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output: 
-  html_document: 
+    html_document:
     keep_md: yes
+    pdf_document: default
 ---
 
-```{r setup, include=FALSE}
+
+# Summary:
+As part of peer graded assignment in the Practical Machine Learning Course, we shall work on building a model based on given data and use it to predict certain variables.
+
+
+### Background:
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+### Reference:
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+### Data: 
+
+The training data for this project are available at: 
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv>
+
+The test data are available at: 
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+### Goal:
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+Below are the steps we undertake to build a model
+```{r setup, include=FALSE,echo=FALSE,warning=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-getwd()
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+library(formattable)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+### Getting Data and removing NA strings:
+```{r download,cache=TRUE}
+Trainfileurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testfileurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+Build_data <- read.csv(Trainfileurl,header=T,stringsAsFactors=FALSE,na.strings=c("NA","#DIV/0!",""))
+test_data <- read.csv(testfileurl,header=T,stringsAsFactors=FALSE,na.strings=c("NA","#DIV/0!",""))
 ```
 
-## Including Plots
+### Exploring Data:
+- *Dimensions of the training data:*
+```{r Explore1}
 
-You can also embed plots, for example:
+dim(Build_data) 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+- *Summary of 'Classe' variable:*
+
+```{r Explore2,echo=TRUE}
+
+barplot(table(Build_data$classe),col=rainbow(5),border = F,ylim = c(0,6500),ylab = "Frequency",xlab="Classe",main="Summary of Classe Variable")
+
+```
+
+### Removing Unwanted fields (both Build and Testing Data):
+```{r Remove}
+
+Build_data_modf <- Build_data[,-c(1:7)]
+test_data_modf <- test_data[,-c(1:7)]
+
+#Keeping only columns which have data populated
+Build_data_modf<-Build_data_modf[,colSums(is.na(Build_data_modf)) == 0]
+test_data_modf <-test_data_modf[,colSums(is.na(test_data_modf)) == 0]
+
+#Coverting 'Classe' variable to type factor for cross tabulation
+Build_data_modf$classe <- as.factor(Build_data_modf$classe)
+```
+
+### Creating Training (70%) and Validation(30%) set:
+We shall now split our Build Data into a training set and Validation set by 70:30 ratio. This helps in cross validation and measure our models' accuracy. We select by using random sampling without replacement. 
+```{r Train}
+
+set.seed(1398)
+inTrain <- createDataPartition(y=Build_data_modf$classe,
+                               p=0.70, list=FALSE)
+Train_data <- Build_data_modf[inTrain,]
+Validate_data <- Build_data_modf[-inTrain,]
+```
+
+- *Dimensions of Training & Validation data set:*
+```{r Train_dim}
+
+dim(Train_data);dim(Validate_data)
+
+```
+
+
+
+### Fitting Model 1 using R part:
+Here we fit a model using the R Part function used for modelling with classification trees, especially when prediciting factor variables.
+```{r Model1}
+
+fitModel1 <- rpart(classe~.,data=Train_data,method="class")
+predictModel1 <- predict(fitModel1,newdata = Validate_data,type="class")
+confusionMatrix(predictModel1,Validate_data$classe)
+
+```
+The confusion matrix and the accuracy field above shows that the model is good but can be better. 
+
+
+- *A plot of the classification tree :*
+
+```{r Plottree}
+rpart.plot(fitModel1,main="Classification Tree")
+```
+
+
+### Fitting Model 2 using Random Forest
+We shall now use random forest, which is considered one of the best method, to fit a model. We undertake the fitting process using the classification split. We also set the training options to use Out of Basket method and choose the BEST function for selection criteria. Since we already worked on a R part model for the training and validation data set, we again split the data afresh into training and validation set for the Random Forest model.  
+```{r Model 2}
+
+set.seed(1498)
+inTrain2 <- createDataPartition(y=Build_data_modf$classe,
+                               p=0.70, list=FALSE)
+Train_data2 <- Build_data_modf[inTrain2,]
+Validate_data2 <- Build_data_modf[-inTrain2,]
+rf_mod <- randomForest(classe ~. , data=Train_data2, method="class",
+                       trControl=trainControl(method="oob",selectionFunction = "best"))
+
+rf_predict <- predict(rf_mod,newdata = Validate_data2,type="class")
+confusionMatrix(rf_predict,Validate_data2$classe)
+
+
+```
+There you go. You can see that the model works good as we have a `r percent(confusionMatrix(rf_predict,Validate_data2$classe)$overall[[1]],digits=2)` accuracy. Our expected Out of Sample error is `r percent(1-confusionMatrix(rf_predict,Validate_data2$classe)$overall[[1]],digits=2)`. This model which has high accuracy on a 5000 odd data (validation set) rows will surely work well on the test set data with 20 observations. 
+
+# Final Predictions:
+We now use our Random Forest Model on the Test Data set
+```{r predict}
+
+predictfinal <- predict(rf_mod, newdata=test_data_modf)
+predictfinal
+
+
+```
+\begin{center}---END---\end{center}
